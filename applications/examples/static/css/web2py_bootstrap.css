@@ -262,3 +262,6 @@ div.controls .error {
         margin-left: -20px;
     }
 }
+[class*=" icon-"]:active{
+  background-image: url("../images/glyphicons-halflings-white.png");
+}

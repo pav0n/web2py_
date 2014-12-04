@@ -2096,9 +2096,8 @@ class SQLFORM(FORM):
                          delete=delete,
                          noconfirm=noconfirm,
                          _title=title or T(buttontext),
-                         _class=ui.get('button'),
+                         _class=ui.get('buttontext'),
                          cid=request.cid)
-
         dbset = db(query, ignore_common_filters=ignore_common_filters)
         tablenames = db._adapter.tables(dbset.query)
         if left is not None:

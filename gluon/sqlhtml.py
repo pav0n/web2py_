@@ -2285,11 +2285,14 @@ class SQLFORM(FORM):
             tsv_with_hidden_cols=
                 (ExporterTSV, 'TSV (Spreadsheets, hidden cols)', T('Spreadsheet-optimised export of tab-separated content including hidden columns. May be slow')),
             tsv=(ExporterTSV, 'TSV (Spreadsheets)', T('Spreadsheet-optimised export of tab-separated content, visible columns only. May be slow.')))
-        if not exportclasses is None:
+        if not exportclasses is 'default' and not exportclasses is None:
             """
             remember: allow to set exportclasses=dict(csv=False, csv_with_hidden_cols=False) to disable the csv format
             """
             exportManager.update(exportclasses)
+        elif exportclasses is None:
+            exportManager = dict()
+
 
         export_type = request.vars._export_type
         if export_type:
@@ -2755,8 +2758,10 @@ class SQLFORM(FORM):
                     _export_type=k,
                     keywords=keywords or ''))
                 export_links.append(A(T(label), _href=link, _title=title, _class='btn btn-default'))
-            export_menu = \
-                DIV(T('Export:'), _class="w2p_export_menu", *export_links)
+            export_menu = None
+            if len(export_links):
+                export_menu = \
+                    DIV(T('Export:'), _class="w2p_export_menu", *export_links)
         else:
             export_menu = None
 

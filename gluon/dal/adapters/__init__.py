@@ -16,7 +16,7 @@ from .google import GoogleDatastoreAdapter, GoogleSQLAdapter
 from .couchdb import CouchDBAdapter
 from .mongo import MongoDBAdapter
 from .imap import IMAPAdapter
-
+from .cassandra import CassandraAdapter
 
 ADAPTERS = {
     'sqlite': SQLiteAdapter,
@@ -56,5 +56,6 @@ ADAPTERS = {
     'google:sql': GoogleSQLAdapter,
     'couchdb': CouchDBAdapter,
     'mongodb': MongoDBAdapter,
-    'imap': IMAPAdapter
+    'imap': IMAPAdapter,
+    'cassandra':CassandraAdapter
 }

@@ -228,7 +228,14 @@ if not 'google' in DRIVERS:
         DRIVERS.append('imaplib')
     except:
         LOGGER.debug('no IMAP driver imaplib')
-        
+    try:
+        from cassandra.cluster import Cluster as cassandra
+        from cassandra.auth import PlainTextAuthProvider as PlainTextAuthProvider
+        LOGGER.warning('cassandra support experimental')
+        DRIVERS.append('cassandra')
+    except:
+        PlainTextAuthProvider = None;
+        LOGGER.debug('no CassandraDB driver cassandra')
     GAEDecimalProperty = None
     NDBDecimalProperty = None
 else:
@@ -302,7 +309,7 @@ else:
                 return decimal.Decimal(value)
             raise TypeError("Property %s must be a Decimal or string."\
                                         % self._name)
-            
+
     psycopg2_adapt = None
     cx_Oracle = None
     pyodbc = None

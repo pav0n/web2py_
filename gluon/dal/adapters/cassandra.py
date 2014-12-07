@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
+__author__ = "pav0n"
+
 import re
 from .._globals import IDENTITY
 from ..helpers.methods import varquote_aux
 from .base import BaseAdapter
 from .._load import PlainTextAuthProvider
+from .._load import ConsistencyLevel
+from .._load import SimpleStatement
 
 class CassandraAdapter(BaseAdapter):
     drivers = ('cassandra',)
@@ -11,9 +15,9 @@ class CassandraAdapter(BaseAdapter):
     commit_on_alter_table = True
     support_distributed_transaction = True
     types = {
-        'boolean': 'CHAR(1)',
+        'boolean': 'boolean',
         'string': 'VARCHAR(%(length)s)',
-        'text': 'LONGTEXT',
+        'text': 'text',
         'json': 'LONGTEXT',
         'password': 'VARCHAR(%(length)s)',
         'blob': 'LONGBLOB',
@@ -131,6 +135,8 @@ class CassandraAdapter(BaseAdapter):
             session.rollback = lambda : ''
             session.commit = lambda : ''
             session.cursor = lambda : session
+            #query = SimpleStatement("INSERT INTO users (name, age) VALUES (%s, %s)",consistency_level=ConsistencyLevel.QUORUM)
+            #session.execute('create table emp_test (empid int primary key, emp_first varchar, emp_last varchar, emp_dept varchar)')
             return  session
         self.connector = connector
         if do_connect: self.reconnect(f=connector)
@@ -140,5 +146,6 @@ class CassandraAdapter(BaseAdapter):
     def lastrowid(self,table):
         self.execute('select last_insert_id();')
         return int(self.cursor.fetchone()[0])
-    def execute(self, command, *a, **b):
-        return self.log_execute(command.decode('utf8'), *a, **b)
+    """def execute(self, command, *a, **b):
+        print "command %s " %command
+        return self.log_execute(command.decode('utf8'), *a, **b)"""

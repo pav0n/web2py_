@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
+__author__ = "pav0n"
+
 import re
 from .._globals import IDENTITY
 from ..helpers.methods import varquote_aux
 from .base import BaseAdapter
 from .._load import PlainTextAuthProvider
+from .._load import ConsistencyLevel
+from .._load import SimpleStatement
 
 class CassandraAdapter(BaseAdapter):
     drivers = ('cassandra',)
@@ -11,13 +15,13 @@ class CassandraAdapter(BaseAdapter):
     commit_on_alter_table = True
     support_distributed_transaction = True
     types = {
-        'boolean': 'CHAR(1)',
-        'string': 'VARCHAR(%(length)s)',
-        'text': 'LONGTEXT',
+        'boolean': 'boolean',
+        'string': 'VARCHAR',
+        'text': 'text',
         'json': 'LONGTEXT',
         'password': 'VARCHAR(%(length)s)',
         'blob': 'LONGBLOB',
-        'upload': 'VARCHAR(%(length)s)',
+        'upload': 'VARCHAR',
         'integer': 'INT',
         'bigint': 'BIGINT',
         'float': 'FLOAT',
@@ -26,12 +30,12 @@ class CassandraAdapter(BaseAdapter):
         'date': 'DATE',
         'time': 'TIME',
         'datetime': 'DATETIME',
-        'id': 'INT AUTO_INCREMENT NOT NULL',
+        'id': 'INT PRIMARY KEY',
         'reference': 'INT, INDEX %(index_name)s (%(field_name)s), FOREIGN KEY (%(field_name)s) REFERENCES %(foreign_key)s ON DELETE %(on_delete_action)s',
         'list:integer': 'LONGTEXT',
         'list:string': 'LONGTEXT',
         'list:reference': 'LONGTEXT',
-        'big-id': 'BIGINT AUTO_INCREMENT NOT NULL',
+        'big-id': 'BIGINT',
         'big-reference': 'BIGINT, INDEX %(index_name)s (%(field_name)s), FOREIGN KEY (%(field_name)s) REFERENCES %(foreign_key)s ON DELETE %(on_delete_action)s',
         'reference FK': ', CONSTRAINT  `FK_%(constraint_name)s` FOREIGN KEY (%(field_name)s) REFERENCES %(foreign_key)s ON DELETE %(on_delete_action)s',
         }
@@ -85,7 +89,13 @@ class CassandraAdapter(BaseAdapter):
         self.execute("XA ROLLBACK;")
 
     REGEX_URI = re.compile('^(?P<user>[^:@]+)(\:(?P<password>[^@]*))?@(?P<host>[^\:/]+)(\:(?P<port>[0-9]+))?/(?P<db>[^?]+)(\?set_encoding=(?P<charset>\w+))?$')
-
+    
+    def create_sequence_and_triggers(self, query, table, **args):
+        # following lines should only be executed if table._sequence_name does not exist
+        # self.execute('CREATE SEQUENCE %s;' % table._sequence_name)
+        # self.execute("ALTER TABLE %s ALTER COLUMN %s SET DEFAULT NEXTVAL('%s');" \
+        #              % (table._tablename, table._fieldname, table._sequence_name))
+        self.execute(query)
     def __init__(self,db,uri,pool_size=0,folder=None,db_codec ='UTF-8',
                  credential_decoder=IDENTITY, driver_args={},
                  adapter_args={}, do_connect=True, after_connection=None):
@@ -127,10 +137,11 @@ class CassandraAdapter(BaseAdapter):
             print driver_args
             cluster = self.driver(**driver_args)
             session = cluster.connect(keyspace)
-            print "session %s" %session
             session.rollback = lambda : ''
             session.commit = lambda : ''
             session.cursor = lambda : session
+            #query = SimpleStatement("INSERT INTO users (name, age) VALUES (%s, %s)",consistency_level=ConsistencyLevel.QUORUM)
+            #session.execute('create table emp_test (empid int primary key, emp_first varchar, emp_last varchar, emp_dept varchar)')
             return  session
         self.connector = connector
         if do_connect: self.reconnect(f=connector)
@@ -140,5 +151,6 @@ class CassandraAdapter(BaseAdapter):
     def lastrowid(self,table):
         self.execute('select last_insert_id();')
         return int(self.cursor.fetchone()[0])
-    def execute(self, command, *a, **b):
-        return self.log_execute(command.decode('utf8'), *a, **b)
+    """def execute(self, command, *a, **b):
+        print "command %s " %command
+        return self.log_execute(command.decode('utf8'), *a, **b)"""

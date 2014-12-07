@@ -231,6 +231,8 @@ if not 'google' in DRIVERS:
     try:
         from cassandra.cluster import Cluster as cassandra
         from cassandra.auth import PlainTextAuthProvider as PlainTextAuthProvider
+        from cassandra import ConsistencyLevel as ConsistencyLevel
+        from cassandra.query import SimpleStatement as SimpleStatement
         LOGGER.warning('cassandra support experimental')
         DRIVERS.append('cassandra')
     except:

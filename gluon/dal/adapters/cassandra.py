@@ -2,14 +2,18 @@
 __author__ = "pav0n"
 
 import re
+import time
 from .._globals import IDENTITY
 from ..helpers.methods import varquote_aux
-from .base import BaseAdapter
-from .._load import PlainTextAuthProvider
+from .base import NoSQLAdapter
+from .._load import PlainTextAuthProvider,web2py_uuid
 from .._load import ConsistencyLevel
 from .._load import SimpleStatement
+from ..helpers.methods import uuid2int
 
-class CassandraAdapter(BaseAdapter):
+TIMINGSSIZE = 100
+
+class CassandraAdapter(NoSQLAdapter):
     drivers = ('cassandra',)
 
     commit_on_alter_table = True
@@ -17,85 +21,40 @@ class CassandraAdapter(BaseAdapter):
     types = {
         'boolean': 'boolean',
         'string': 'VARCHAR',
-        'text': 'text',
-        'json': 'LONGTEXT',
-        'password': 'VARCHAR(%(length)s)',
-        'blob': 'LONGBLOB',
+        'text': 'TEXT',
+        'json': 'TEXT',
+        'password': 'VARCHAR',
+        'blob': 'BLOB',
         'upload': 'VARCHAR',
         'integer': 'INT',
         'bigint': 'BIGINT',
         'float': 'FLOAT',
         'double': 'DOUBLE',
-        'decimal': 'NUMERIC(%(precision)s,%(scale)s)',
-        'date': 'DATE',
-        'time': 'TIME',
-        'datetime': 'DATETIME',
+        'decimal': 'DECIMAL',
+        'date': 'TIMESTAMP',
+        'time': 'TIMESTAMP',
+        'datetime': 'TIMESTAMP',
         'id': 'INT PRIMARY KEY',
-        'reference': 'INT, INDEX %(index_name)s (%(field_name)s), FOREIGN KEY (%(field_name)s) REFERENCES %(foreign_key)s ON DELETE %(on_delete_action)s',
-        'list:integer': 'LONGTEXT',
-        'list:string': 'LONGTEXT',
-        'list:reference': 'LONGTEXT',
+        'reference': 'BIGINT',
+        'list:integer': 'TEXT',
+        'list:string': 'TEXT',
+        'list:reference': 'TEXT',
         'big-id': 'BIGINT',
-        'big-reference': 'BIGINT, INDEX %(index_name)s (%(field_name)s), FOREIGN KEY (%(field_name)s) REFERENCES %(foreign_key)s ON DELETE %(on_delete_action)s',
-        'reference FK': ', CONSTRAINT  `FK_%(constraint_name)s` FOREIGN KEY (%(field_name)s) REFERENCES %(foreign_key)s ON DELETE %(on_delete_action)s',
-        }
+        'big-reference': 'BIGINT'
+    }
 
     QUOTE_TEMPLATE = "`%s`"
 
-    def varquote(self,name):
-        return varquote_aux(name,'`%s`')
-
-    def RANDOM(self):
-        return 'RAND()'
-
-    def SUBSTRING(self,field,parameters):
-        return 'SUBSTRING(%s,%s,%s)' % (self.expand(field),
-                                        parameters[0], parameters[1])
-
-    def EPOCH(self, first):
-        return "UNIX_TIMESTAMP(%s)" % self.expand(first)
-
-    def CONCAT(self, *items):
-        return 'CONCAT(%s)' % ','.join(self.expand(x,'string') for x in items)
-
-    def REGEXP(self,first,second):
-        return '(%s REGEXP %s)' % (self.expand(first),
-                                   self.expand(second,'string'))
-
-    def CAST(self, first, second):
-        if second=='LONGTEXT': second = 'CHAR'
-        return 'CAST(%s AS %s)' % (first, second)
-
-    def _drop(self,table,mode):
-        # breaks db integrity but without this mysql does not drop table
-        table_rname = table.sqlsafe
-        return ['SET FOREIGN_KEY_CHECKS=0;','DROP TABLE %s;' % table_rname,
-                'SET FOREIGN_KEY_CHECKS=1;']
-
-    def _insert_empty(self, table):
-        return 'INSERT INTO %s VALUES (DEFAULT);' % (table.sqlsafe)
-
-    def distributed_transaction_begin(self,key):
-        self.execute('XA START;')
-
-    def prepare(self,key):
-        self.execute("XA END;")
-        self.execute("XA PREPARE;")
-
-    def commit_prepared(self,key):
-        self.execute("XA COMMIT;")
-
-    def rollback_prepared(self,key):
-        self.execute("XA ROLLBACK;")
 
     REGEX_URI = re.compile('^(?P<user>[^:@]+)(\:(?P<password>[^@]*))?@(?P<host>[^\:/]+)(\:(?P<port>[0-9]+))?/(?P<db>[^?]+)(\?set_encoding=(?P<charset>\w+))?$')
-    
+
     def create_sequence_and_triggers(self, query, table, **args):
         # following lines should only be executed if table._sequence_name does not exist
         # self.execute('CREATE SEQUENCE %s;' % table._sequence_name)
         # self.execute("ALTER TABLE %s ALTER COLUMN %s SET DEFAULT NEXTVAL('%s');" \
         #              % (table._tablename, table._fieldname, table._sequence_name))
         self.execute(query)
+
     def __init__(self,db,uri,pool_size=0,folder=None,db_codec ='UTF-8',
                  credential_decoder=IDENTITY, driver_args={},
                  adapter_args={}, do_connect=True, after_connection=None):
@@ -108,6 +67,9 @@ class CassandraAdapter(BaseAdapter):
         self.db_codec = db_codec
         self._after_connection = after_connection
         self.find_or_make_work_folder()
+        import random
+        self.random = random
+
         ruri = uri.split('://',1)[1]
         m = self.REGEX_URI.match(ruri)
         if not m:
@@ -151,6 +113,57 @@ class CassandraAdapter(BaseAdapter):
     def lastrowid(self,table):
         self.execute('select last_insert_id();')
         return int(self.cursor.fetchone()[0])
-    """def execute(self, command, *a, **b):
+    def execute(self, command, *a, **b):
         print "command %s " %command
-        return self.log_execute(command.decode('utf8'), *a, **b)"""
+        return self.log_execute(command.decode('utf8'), *a, **b)
+
+    def log_execute(self, *a, **b):
+        if not self.connection: raise ValueError(a[0])
+        if not self.connection: return None
+        command = a[0]
+        if hasattr(self,'filter_sql_command'):
+            command = self.filter_sql_command(command)
+        if self.db._debug:
+            LOGGER.debug('SQL: %s' % command)
+        self.db._lastsql = command
+        t0 = time.time()
+        ret = self.cursor.execute(command, *a[1:], **b)
+        self.db._timings.append((command,time.time()-t0))
+        del self.db._timings[:-TIMINGSSIZE]
+        return ret
+
+    def insert(self, table, fields, safe=None):
+        """Safe determines whether a asynchronous request is done or a
+        synchronous action is done
+        For safety, we use by default synchronous requests"""
+        print "imprimiendo id %s" %table.id
+        print "imprimiendo id %s" %table._id
+        try:
+            id = uuid2int(web2py_uuid())
+            values = dict((k.name,self.represent(v,k.type)) for k,v in fields)
+            values['_id'] = id
+
+            query = SimpleStatement(self._insert(table,values),consistency_level=ConsistencyLevel.QUORUM)
+            session.execute(query)
+        except Exception,e:
+            print 'imprimiendo el Error %s'%e
+        print 'imprimiendo el id : %s'%id
+        return id
+
+
+
+
+    def _insert(self, table, fields):
+        table_rname = table.sqlsafe
+        if fields:
+            print 'estos son los fields'
+            print fields
+            keys = ','.join(f.name for f, v in fields)
+            values = ','.join(self.expand(v, f.type) for f, v in fields)
+            print '######################################################################'
+            print 'insertando cosas'
+            print '######################################################################'
+            print 'INSERT INTO %s(%s) VALUES (%s);' % (table_rname, keys, values)
+            return 'INSERT INTO %s(%s) VALUES (%s);' % (table_rname, keys, values)
+        else:
+            return self._insert_empty(table)

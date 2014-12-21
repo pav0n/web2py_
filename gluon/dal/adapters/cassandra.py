@@ -5,7 +5,7 @@ import re
 import time
 from .._globals import IDENTITY
 from ..helpers.methods import varquote_aux
-from .base import NoSQLAdapter
+from .base import NoSQLAdapter, BaseAdapter
 from .._load import PlainTextAuthProvider,web2py_uuid
 from .._load import ConsistencyLevel
 from .._load import SimpleStatement
@@ -34,7 +34,7 @@ class CassandraAdapter(NoSQLAdapter):
         'date': 'TIMESTAMP',
         'time': 'TIMESTAMP',
         'datetime': 'TIMESTAMP',
-        'id': 'INT PRIMARY KEY',
+        'id': 'TEXT PRIMARY KEY',
         'reference': 'BIGINT',
         'list:integer': 'TEXT',
         'list:string': 'TEXT',
@@ -102,6 +102,7 @@ class CassandraAdapter(NoSQLAdapter):
             session.rollback = lambda : ''
             session.commit = lambda : ''
             session.cursor = lambda : session
+
             #query = SimpleStatement("INSERT INTO users (name, age) VALUES (%s, %s)",consistency_level=ConsistencyLevel.QUORUM)
             #session.execute('create table emp_test (empid int primary key, emp_first varchar, emp_last varchar, emp_dept varchar)')
             return  session
@@ -136,34 +137,30 @@ class CassandraAdapter(NoSQLAdapter):
         """Safe determines whether a asynchronous request is done or a
         synchronous action is done
         For safety, we use by default synchronous requests"""
-        print "imprimiendo id %s" %table.id
-        print "imprimiendo id %s" %table._id
         try:
             id = uuid2int(web2py_uuid())
-            values = dict((k.name,self.represent(v,k.type)) for k,v in fields)
-            values['_id'] = id
-
+            values = dict((k.name,BaseAdapter.represent(self,v,k.type)) for k,v in fields)
+            values['id'] ="'%s'" % id
             query = SimpleStatement(self._insert(table,values),consistency_level=ConsistencyLevel.QUORUM)
-            session.execute(query)
+            self.cursor.execute(query)
         except Exception,e:
             print 'imprimiendo el Error %s'%e
         print 'imprimiendo el id : %s'%id
         return id
 
 
+    def represent_exceptions(self, obj, fieldtype):
+        if fieldtype in ('string','id'):
+            return "'%s'" % obj
+        else:
+            return obj
 
 
     def _insert(self, table, fields):
-        table_rname = table.sqlsafe
+        table_rname = table
         if fields:
-            print 'estos son los fields'
-            print fields
-            keys = ','.join(f.name for f, v in fields)
-            values = ','.join(self.expand(v, f.type) for f, v in fields)
-            print '######################################################################'
-            print 'insertando cosas'
-            print '######################################################################'
-            print 'INSERT INTO %s(%s) VALUES (%s);' % (table_rname, keys, values)
+            keys = ','.join(f for f, v in fields.items())
+            values = ','.join(v for f, v in fields.items())
             return 'INSERT INTO %s(%s) VALUES (%s);' % (table_rname, keys, values)
         else:
             return self._insert_empty(table)

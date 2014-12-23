@@ -536,7 +536,8 @@ class UploadWidget(FormWidget):
         attr = cls._attributes(field, default, **attributes)
 
         inp = INPUT(**attr)
-
+        inp['_onchange'] = "loadFile(event,this)"
+        img_id = "%s_upload_img"%attr['_id']
         if download_url and value:
             if callable(download_url):
                 url = download_url(value)
@@ -545,7 +546,7 @@ class UploadWidget(FormWidget):
             (br, image) = ('', '')
             if UploadWidget.is_image(value):
                 br = BR()
-                image = IMG(_src=url, _width=cls.DEFAULT_WIDTH)
+                image = IMG(_src=url, _width=cls.DEFAULT_WIDTH, _id=img_id)
 
             requires = attr["requires"]
             if requires == [] or isinstance(requires, IS_EMPTY_OR):
@@ -568,6 +569,10 @@ class UploadWidget(FormWidget):
                                A(current.T(cls.GENERIC_DESCRIPTION), _href=url),
                                ']', _style='white-space:nowrap'),
                           br, image)
+        else:
+            image = IMG(_width=cls.DEFAULT_WIDTH, _id=img_id,_alt='')
+            inp = DIV(inp,BR(), image)
+
         return inp
 
     @classmethod

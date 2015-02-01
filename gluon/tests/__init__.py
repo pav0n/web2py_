@@ -23,7 +23,7 @@ if sys.version[:3] == '2.7':
 
 
 NOSQL = any([name in (os.getenv("DB") or "")
-            for name in ("datastore", "mongodb", "imap")])
+            for name in ("datastore", "mongodb", "imap","cassandra")])
 
 if NOSQL:
     from test_dal_nosql import *

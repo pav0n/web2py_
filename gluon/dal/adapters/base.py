@@ -234,7 +234,8 @@ class BaseAdapter(ConnectionPool):
     def create_table(self, table,
                      migrate=True,
                      fake_migrate=False,
-                     polymodel=None):
+                     polymodel=None,
+                     primarys_key=None):
         db = table._db
         fields = []
         # PostGIS geo fields are added after the table has been created
@@ -419,11 +420,20 @@ class BaseAdapter(ConnectionPool):
 
         table_rname = table.sqlsafe
 
-        if getattr(table,'_primarykey',None):
+        if self.dbengine in ('cassandra',):
+            #pks = '' if not  primarys_key else 'PRIMARY KEY (%s)'  %','.join(mkey for mkey in primarys_key)
+            query = "CREATE TABLE %s(\n    %s %s)%s" % \
+                (table.sqlsafe, fields,
+                 '' if not  primarys_key else ',\nPRIMARY KEY (%s)\n'  %','.join(mkey for mkey in primarys_key)
+                 ,other)
+
+        elif getattr(table,'_primarykey',None):
+            print "primary  _primarykey"
             query = "CREATE TABLE %s(\n    %s,\n    %s) %s" % \
                 (table.sqlsafe, fields,
                  self.PRIMARY_KEY(', '.join([self.QUOTE_TEMPLATE % pk for pk in table._primarykey])),other)
         else:
+            print "else _primarykey"
             query = "CREATE TABLE %s(\n    %s\n)%s" % \
                 (table.sqlsafe, fields, other)
 
@@ -694,6 +704,10 @@ class BaseAdapter(ConnectionPool):
         if fields:
             keys = ','.join(f.sqlsafe_name for f, v in fields)
             values = ','.join(self.expand(v, f.type) for f, v in fields)
+            print '######################################################################'
+            print 'insertando cosas'
+            print '######################################################################'
+            print 'INSERT INTO %s(%s) VALUES (%s);' % (table_rname, keys, values)
             return 'INSERT INTO %s(%s) VALUES (%s);' % (table_rname, keys, values)
         else:
             return self._insert_empty(table)
@@ -724,6 +738,7 @@ class BaseAdapter(ConnectionPool):
         return rid
 
     def bulk_insert(self, table, items):
+        print 'primero imprimiendo esto'
         return [self.insert(table,item) for item in items]
 
     def NOT(self, first):
@@ -1320,6 +1335,7 @@ class BaseAdapter(ConnectionPool):
         if isinstance(obj, CALLABLETYPES):
             obj = obj()
         if isinstance(fieldtype, SQLCustomType):
+            print "instancia de SQLCustomType"
             value = fieldtype.encoder(obj)
             if fieldtype.type in ('string','text', 'json'):
                 return self.adapt(value)

@@ -138,15 +138,14 @@ class CassandraAdapter(NoSQLAdapter):
         synchronous action is done
         For safety, we use by default synchronous requests"""
         try:
-            id = uuid2int(web2py_uuid())
-            values = dict((k.name,BaseAdapter.represent(self,v,k.type)) for k,v in fields)
-            values['id'] ="'%s'" % id
+            #id = uuid2int(web2py_uuid())
+            #values = dict((k.name,BaseAdapter.represent(self,v,k.type)) for k,v in fields)
+            #values['id'] ="'%s'" % id
             query = SimpleStatement(self._insert(table,values),consistency_level=ConsistencyLevel.QUORUM)
             self.cursor.execute(query)
         except Exception,e:
             print 'imprimiendo el Error %s'%e
-        print 'imprimiendo el id : %s'%id
-        return id
+        return None
 
 
     def represent_exceptions(self, obj, fieldtype):

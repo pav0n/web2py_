@@ -816,12 +816,14 @@ class DAL(object):
             fake_migrate = self._fake_migrate_all or \
                 args_get('fake_migrate',self._fake_migrate)
             polymodel = args_get('polymodel',None)
+            primarys_key = args_get('primarys_key', None)
             try:
                 GLOBAL_LOCKER.acquire()
                 self._lastsql = self._adapter.create_table(
                     table,migrate=migrate,
                     fake_migrate=fake_migrate,
-                    polymodel=polymodel)
+                    polymodel=polymodel,
+                    primarys_key=primarys_key)
             finally:
                 GLOBAL_LOCKER.release()
         else:

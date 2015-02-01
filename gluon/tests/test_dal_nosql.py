@@ -352,14 +352,18 @@ class TestSelect(unittest.TestCase):
 class TestAddMethod(unittest.TestCase):
 
     def testRun(self):
-        db = DAL(DEFAULT_URI, check_reserved=['all'])
+        print 'antes de conectar'
+        db = DAL(DEFAULT_URI,pool_size=1,check_reserved=['all'])
+        print 'conecto'
         db.define_table('tt', Field('aa'))
+        print 'definio'
         @db.tt.add_method.all
         def select_all(table,orderby=None):
             return table._db(table).select(orderby=orderby)
         self.assertEqual(isinstance(db.tt.insert(aa='1'), long), True)
         self.assertEqual(isinstance(db.tt.insert(aa='2'), long), True)
         self.assertEqual(isinstance(db.tt.insert(aa='3'), long), True)
+        print 'inserto'
         self.assertEqual(len(db.tt.all()), 3)
         drop(db.tt)
 
@@ -1388,7 +1392,7 @@ class TestQuoting(unittest.TestCase):
 
 class TestTableAndFieldCase(unittest.TestCase):
     """
-    at the Python level we should not allow db.C and db.c because of .table conflicts on windows 
+    at the Python level we should not allow db.C and db.c because of .table conflicts on windows
     but it should be possible to map two different names into distinct tables "c" and "C" at the Python level
     By default Python models names should be mapped into lower case table names and assume case insensitivity.
     """

@@ -249,6 +249,8 @@ class Table(object):
         """
         # import DAL here to avoid circular imports
         from .base import DAL
+        from .adapters.base import NoSQLAdapter
+
         self._actual = False  # set to True by define_table()
         self._tablename = tablename
         if (not isinstance(tablename, str) or tablename[0] == '_'
@@ -293,7 +295,7 @@ class Table(object):
             if len(_primarykey) == 1:
                 self._id = [f for f in fields if isinstance(f, Field)
                                 and f.name ==_primarykey[0]][0]
-        elif not [f for f in fields if (isinstance(f, Field) and
+        elif not isinstance(db._adapter, NoSQLAdapter) and not [f for f in fields if (isinstance(f, Field) and
                   f.type == 'id') or (isinstance(f, dict) and
                   f.get("type", None) == "id")]:
             field = Field('id', 'id')
@@ -690,7 +692,7 @@ class Table(object):
                 if not (value is None or isinstance(value, str)):
                     if hasattr(value, 'file') and hasattr(value, 'filename'):
                         new_name = field.store(value.file, filename=value.filename)
-                    elif isinstance(value,dict): 
+                    elif isinstance(value,dict):
                         if 'data' in value and 'filename' in value:
                             stream = StringIO.StringIO(value['data'])
                             new_name = field.store(stream, filename=value['filename'])
@@ -2567,7 +2569,7 @@ class Rows(object):
         :param render: whether we will render the fields using their represent
                        (default False) can be a list of fields to render or
                        True to render all.
-        """        
+        """
         roots = []
         drows = {}
         rows = list(self.render(fields=None if render is True else render)) if render else self
